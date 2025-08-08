@@ -1,0 +1,542 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Guitar Tuner — Sleek</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0f1115;
+    --card:#0f1720;
+    --muted:#99a1b3;
+    --accent:#6be4b4;
+    --accent-2:#6bb0ff;
+    --danger:#ff6b6b;
+    --glass: rgba(255,255,255,0.03);
+    --glass-2: rgba(255,255,255,0.02);
+    --shadow: 0 6px 18px rgba(2,6,23,0.6);
+    font-family: 'Inter', system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+  }
+  html,body{height:100%;margin:0;background:
+    radial-gradient(1200px 600px at 10% 10%, rgba(107,176,255,0.06), transparent 6%),
+    radial-gradient(900px 400px at 90% 80%, rgba(107,228,180,0.04), transparent 6%),
+    var(--bg); color:#dfe8f5;}
+  .wrap{
+    min-height:100vh; display:flex; align-items:center; justify-content:center; padding:28px;
+  }
+  .card{
+    width:970px; max-width:98%; background:linear-gradient(180deg,var(--card), #08101a 110%);
+    border-radius:16px; padding:28px; box-shadow:var(--shadow); display:grid; grid-template-columns: 380px 1fr; gap:22px;
+    border: 1px solid rgba(255,255,255,0.03);
+  }
+
+  /* Left column - tuner visualization */
+  .visual{
+    background:linear-gradient(180deg, rgba(255,255,255,0.02), transparent 40%);
+    border-radius:12px; padding:18px; display:flex; flex-direction:column; gap:14px; align-items:center;
+  }
+  h1{margin:0;font-size:18px;font-weight:600;color: #eaf4ff;}
+  .sub{font-size:13px;color:var(--muted);margin-top:4px;}
+  .needle-wrap{
+    width:100%; height:260px; display:flex; align-items:center; justify-content:center; position:relative;
+  }
+  .gauge{
+    width:100%; max-width:320px; height:160px; position:relative;
+    transform: translateY(10px);
+  }
+
+  /* Needle + arc */
+  svg {overflow:visible; display:block;}
+  .needle {
+    transform-origin: 50% 75%;
+    transition: transform 0.12s cubic-bezier(.2,.9,.2,1);
+    filter: drop-shadow(0 6px 12px rgba(0,0,0,0.6));
+  }
+  .center-dot{fill:#f6f9ff; stroke: rgba(255,255,255,0.08); stroke-width:3; }
+
+  .string-list{width:100%;display:flex;flex-direction:column;gap:6px;margin-top:6px;}
+  .string {
+    display:flex; align-items:center; justify-content:space-between; padding:8px 12px; border-radius:10px;
+    background: linear-gradient(180deg, rgba(255,255,255,0.015), transparent 40%);
+    border:1px solid rgba(255,255,255,0.02); font-weight:600; color:#e6f2ff;
+  }
+  .string .label{font-size:14px;}
+  .string .freq{font-size:13px;color:var(--muted);font-weight:500;}
+
+  /* Right column — controls & readouts */
+  .controls{
+    display:flex; flex-direction:column; gap:14px; padding:12px 8px;
+  }
+  .readout {
+    background:var(--glass); border-radius:12px; padding:14px; display:flex; align-items:center; justify-content:space-between;
+    box-shadow: inset 0 -8px 24px rgba(0,0,0,0.25);
+  }
+  .big {
+    display:flex; flex-direction:column;
+  }
+  .note{
+    font-size:34px; font-weight:700; letter-spacing:0.6px;
+  }
+  .det{
+    font-size:13px; color:var(--muted);
+  }
+  .cents{
+    font-weight:700; font-size:28px;
+  }
+
+  .calib {
+    display:flex; gap:12px; align-items:center; justify-content:space-between;
+    background:var(--glass-2); padding:12px; border-radius:12px; border: 1px solid rgba(255,255,255,0.02);
+  }
+  input[type="range"]{width:100%;}
+  .btn {
+    background: linear-gradient(90deg,var(--accent),var(--accent-2)); padding:8px 14px; border-radius:10px; color:#062026; font-weight:700; border:none; cursor:pointer;
+    box-shadow: 0 6px 18px rgba(107,228,180,0.09);
+  }
+  .btn.soft{background:transparent; border:1px solid rgba(255,255,255,0.04); color:var(--muted); font-weight:600;}
+  .status {font-size:13px;color:var(--muted);}
+
+  .meter {
+    height:86px; border-radius:10px; background:linear-gradient(180deg, rgba(255,255,255,0.015), transparent);
+    display:flex; align-items:center; justify-content:center; position:relative; overflow:hidden;
+  }
+  .meter canvas{width:100%; height:100%;}
+  .footer {font-size:12px;color:var(--muted); text-align:center; margin-top:8px;}
+
+  /* responsive */
+  @media (max-width:880px){
+    .card{grid-template-columns: 1fr; padding:18px;}
+    .needle-wrap{height:200px}
+    .gauge{max-width:260px;height:140px}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="card" role="application" aria-label="Guitar Tuner">
+    <div class="visual">
+      <div style="width:100%;display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <h1>Guitar Tuner</h1>
+          <div class="sub">Sleek • Smooth animations • Real-time</div>
+        </div>
+        <div class="status" id="status">Idle</div>
+      </div>
+
+      <div class="needle-wrap" aria-hidden="false">
+        <div class="gauge" id="gauge">
+          <!-- SVG gauge -->
+          <svg viewBox="0 0 400 200" preserveAspectRatio="xMidYMid meet" width="100%" height="100%" >
+            <!-- background arc -->
+            <defs>
+              <linearGradient id="grad" x1="0%" x2="100%">
+                <stop offset="0%" stop-color="#ff6b6b" stop-opacity="0.95"/>
+                <stop offset="50%" stop-color="#ffd56b" stop-opacity="0.95"/>
+                <stop offset="100%" stop-color="#6be4b4" stop-opacity="0.95"/>
+              </linearGradient>
+            </defs>
+            <path d="M40 160 A160 160 0 0 1 360 160" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="18"/>
+            <path id="activeArc" d="M40 160 A160 160 0 0 1 360 160" fill="none" stroke="url(#grad)" stroke-width="18" stroke-linecap="round" stroke-dasharray="0 1000"/>
+            <!-- ticks -->
+            <g id="ticks"></g>
+
+            <!-- needle group -->
+            <g id="needleGroup" class="needle" transform="translate(200,140) rotate(0)">
+              <path d="M0 -8 L6 -8 L2 -68 L-2 -68 L-6 -8 Z" fill="#ffffff" opacity="0.95" />
+              <circle r="8" class="center-dot"></circle>
+            </g>
+
+            <!-- center label (note & cents) -->
+            <text x="200" y="38" text-anchor="middle" font-size="18" fill="#eaf4ff" font-weight="700" id="gaugeNote"></text>
+            <text x="200" y="62" text-anchor="middle" font-size="14" fill="#9fb0c8" id="gaugeCents"></text>
+          </svg>
+        </div>
+      </div>
+
+      <div class="string-list" aria-hidden="false" id="stringList">
+        <!-- dynamically filled with strings -->
+      </div>
+
+    </div>
+
+    <div class="controls">
+      <div class="readout">
+        <div class="big">
+          <div class="note" id="noteName">—</div>
+          <div class="det" id="freqDisp">— Hz</div>
+        </div>
+        <div style="text-align:right">
+          <div class="cents" id="cents">—</div>
+          <div class="det" id="closest">—</div>
+        </div>
+      </div>
+
+      <div class="calib">
+        <div style="flex:1">
+          <div style="font-size:13px;color:var(--muted);margin-bottom:6px">A4 reference: <span id="aRefLabel">440</span> Hz</div>
+          <input type="range" id="aRef" min="420" max="460" value="440" step="0.5" />
+        </div>
+        <div style="width:110px;display:flex;flex-direction:column;gap:8px;align-items:flex-end;">
+          <button id="startBtn" class="btn">Start</button>
+          <button id="stopBtn" class="btn soft">Stop</button>
+        </div>
+      </div>
+
+      <div class="meter" aria-hidden="false">
+        <canvas id="meterCanvas" width="600" height="150"></canvas>
+      </div>
+
+      <div style="display:flex;gap:12px;align-items:center;justify-content:space-between;">
+        <div class="status" id="micPerm">Mic: unknown</div>
+        <div style="display:flex;gap:8px;">
+          <button id="muteBtn" class="btn soft">Mute</button>
+          <button id="calNote" class="btn soft">Play Reference</button>
+        </div>
+      </div>
+
+      <div class="footer">Works best with quiet signal near the instrument. Allow mic access. Built with WebAudio.</div>
+    </div>
+  </div>
+</div>
+
+<script>
+/*
+  Guitar Tuner — Single file
+  - Uses getUserMedia + WebAudio
+  - Autocorrelation pitch detection
+  - Smooth needle & cent readout
+*/
+
+const strings = [
+  {name:'E2', freq:82.4069},
+  {name:'A2', freq:110.0000},
+  {name:'D3', freq:146.8324},
+  {name:'G3', freq:195.9977},
+  {name:'B3', freq:246.9417},
+  {name:'E4', freq:329.6276}
+];
+
+const ctxEls = {
+  status: document.getElementById('status'),
+  noteName: document.getElementById('noteName'),
+  freqDisp: document.getElementById('freqDisp'),
+  cents: document.getElementById('cents'),
+  closest: document.getElementById('closest'),
+  gaugeNote: document.getElementById('gaugeNote'),
+  gaugeCents: document.getElementById('gaugeCents'),
+  needleGroup: document.getElementById('needleGroup'),
+  activeArc: document.getElementById('activeArc'),
+  stringList: document.getElementById('stringList'),
+  aRef: document.getElementById('aRef'),
+  aRefLabel: document.getElementById('aRefLabel'),
+  startBtn: document.getElementById('startBtn'),
+  stopBtn: document.getElementById('stopBtn'),
+  micPerm: document.getElementById('micPerm'),
+  meterCanvas: document.getElementById('meterCanvas'),
+  muteBtn: document.getElementById('muteBtn'),
+  calNote: document.getElementById('calNote')
+};
+
+let audioCtx = null;
+let analyser = null;
+let mediaStream = null;
+let sourceNode = null;
+let rafId = null;
+let dataArray = null;
+let bufferLength = 2048;
+let isMuted = false;
+
+// Render string list
+function renderStrings(){
+  ctxEls.stringList.innerHTML = '';
+  for (let s of strings.slice().reverse()){
+    const el = document.createElement('div');
+    el.className = 'string';
+    el.innerHTML = `<div class="label">${s.name}</div><div class="freq">${s.freq.toFixed(2)} Hz</div>`;
+    ctxEls.stringList.appendChild(el);
+  }
+}
+renderStrings();
+
+function setStatus(t){
+  ctxEls.status.textContent = t;
+}
+
+// Meter drawing
+const meterCtx = ctxEls.meterCanvas.getContext('2d');
+function drawMeter(freq, amp){
+  const c = ctxEls.meterCanvas;
+  const w = c.width, h = c.height;
+  meterCtx.clearRect(0,0,w,h);
+  // background bar
+  meterCtx.fillStyle = 'rgba(255,255,255,0.03)';
+  meterCtx.fillRect(0, h*0.45, w, h*0.12);
+  // amplitude bar
+  const aw = Math.min(w, amp * w * 2);
+  meterCtx.fillStyle = 'rgba(107,176,255,0.14)';
+  meterCtx.fillRect(0, h*0.45, aw, h*0.12);
+  // frequency text
+  meterCtx.fillStyle = 'rgba(255,255,255,0.85)';
+  meterCtx.font = '600 14px Inter, system-ui';
+  meterCtx.fillText(freq ? freq.toFixed(1) + ' Hz' : '-', 10, h*0.25);
+}
+
+// Pitch detection - autocorrelation
+function autoCorrelate(buf, sampleRate) {
+  // Implementation adapted from Chris Wilson's explanation
+  const SIZE = buf.length;
+  let rms = 0;
+  for (let i=0;i<SIZE;i++){
+    const val = buf[i];
+    rms += val*val;
+  }
+  rms = Math.sqrt(rms/SIZE);
+  if (rms < 0.01) return -1; // too quiet
+
+  let r1 = 0, r2 = SIZE-1, thres = 0.2;
+  for (let i=0;i<SIZE/2;i++){
+    if (Math.abs(buf[i]) < thres){ r1 = i; break; }
+  }
+  for (let i=1;i<SIZE/2;i++){
+    if (Math.abs(buf[SIZE-i]) < thres){ r2 = SIZE-i; break; }
+  }
+  buf = buf.slice(r1, r2);
+  const newSize = buf.length;
+  const c = new Array(newSize).fill(0);
+  for (let i=0; i<newSize; i++){
+    for (let j=0; j<newSize-i; j++){
+      c[i] = c[i] + buf[j]*buf[j+i];
+    }
+  }
+  let d = 0;
+  while (c[d] > c[d+1]) d++;
+  let maxval = -1, maxpos = -1;
+  for (let i=d; i<newSize; i++){
+    if (c[i] > maxval){
+      maxval = c[i];
+      maxpos = i;
+    }
+  }
+  let T0 = maxpos;
+  if (!T0) return -1;
+  // parabolic interpolation
+  const x1 = c[T0-1], x2 = c[T0], x3 = c[T0+1];
+  const a = (x1 + x3 - 2*x2)/2;
+  const b = (x3 - x1)/2;
+  if (a) T0 = T0 - b/(2*a);
+  return sampleRate / T0;
+}
+
+// find nearest string and cents
+function freqToNoteInfo(freq, aRef=440){
+  if (freq <= 0) return null;
+  // midi note formula with variable A4
+  const a4 = aRef;
+  const noteNum = 12 * (Math.log(freq / a4) / Math.log(2)) + 69;
+  const rounded = Math.round(noteNum);
+  const cents = Math.floor((noteNum - rounded) * 100);
+  // find nearest standard guitar string (by freq distance)
+  let nearest = null;
+  let minDiff = Infinity;
+  for (let s of strings){
+    const diff = Math.abs( (Math.log(freq/s.freq)/Math.log(2)) * 1200 );
+    if (diff < minDiff){ minDiff = diff; nearest = s; }
+  }
+  const noteName = midiToNoteName(rounded);
+  return {noteName, cents, nearest, freq, noteNum, rounded, diffToNearest: minDiff};
+}
+
+function midiToNoteName(n){
+  const names = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+  const name = names[(n%12+12)%12] || '?';
+  const octave = Math.floor(n/12) -1;
+  return name + octave;
+}
+
+// Visual & UI updates
+function updateUI(info, amp){
+  if (!info){
+    ctxEls.noteName.textContent = '—';
+    ctxEls.freqDisp.textContent = '— Hz';
+    ctxEls.cents.textContent = '—';
+    ctxEls.closest.textContent = '—';
+    ctxEls.gaugeNote.textContent = '';
+    ctxEls.gaugeCents.textContent = '';
+    ctxEls.needleGroup.style.transform = `translate(200px,140px) rotate(0deg)`;
+    ctxEls.activeArc.setAttribute('stroke-dasharray','0 1000');
+    drawMeter(null, 0);
+    return;
+  }
+  const freq = info.freq;
+  const cents = info.cents;
+  ctxEls.noteName.textContent = info.noteName;
+  ctxEls.freqDisp.textContent = freq.toFixed(1) + ' Hz';
+  ctxEls.cents.textContent = (cents>0?'+':'') + cents + '¢';
+  ctxEls.closest.textContent = `${info.nearest.name} • ${info.nearest.freq.toFixed(1)} Hz`;
+
+  ctxEls.gaugeNote.textContent = info.noteName;
+  ctxEls.gaugeCents.textContent = (cents>0?'+':'') + cents + ' cents';
+
+  // map cents (-50..+50) to -40..+40 degrees for needle
+  const maxDeg = 40;
+  const deg = Math.max(-100, Math.min(100, (info.cents))) * (maxDeg/100);
+  ctxEls.needleGroup.style.transform = `translate(200px,140px) rotate(${deg}deg)`;
+
+  // active arc length based on accuracy
+  const arcPercent = Math.max(0, 1 - Math.abs(cents)/100);
+  const arcLen = arcPercent * 1000;
+  ctxEls.activeArc.setAttribute('stroke-dasharray', `${arcLen} 1000`);
+
+  drawMeter(freq, amp);
+}
+
+// animation loop & audio processing
+function processAudio(){
+  if (!analyser) return;
+  const buf = new Float32Array(bufferLength);
+  analyser.getFloatTimeDomainData(buf);
+  // amplitude measure
+  let amp = 0;
+  for (let i=0;i<buf.length;i++){ amp += Math.abs(buf[i]); } amp = amp / buf.length;
+  const pitch = autoCorrelate(buf, audioCtx.sampleRate);
+  if (pitch === -1) {
+    updateUI(null, amp);
+  } else {
+    const aRefVal = parseFloat(ctxEls.aRef.value);
+    const info = freqToNoteInfo(pitch, aRefVal);
+    updateUI(info, amp);
+  }
+  rafId = requestAnimationFrame(processAudio);
+}
+
+// start & stop mic
+async function startTuner(){
+  if (audioCtx && audioCtx.state === 'suspended') await audioCtx.resume();
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  try {
+    mediaStream = await navigator.mediaDevices.getUserMedia({audio:{channelCount:1, sampleRate:44100}, video:false});
+    ctxEls.micPerm.textContent = 'Mic: granted';
+  } catch (e){
+    ctxEls.micPerm.textContent = 'Mic: denied';
+    setStatus('Microphone permission required');
+    return;
+  }
+  analyser = audioCtx.createAnalyser();
+  analyser.fftSize = bufferLength;
+  sourceNode = audioCtx.createMediaStreamSource(mediaStream);
+  const gainNode = audioCtx.createGain();
+  gainNode.gain.value = isMuted ? 0 : 1;
+  sourceNode.connect(gainNode);
+  gainNode.connect(analyser);
+  dataArray = new Float32Array(analyser.fftSize);
+  setStatus('Listening');
+  if (rafId) cancelAnimationFrame(rafId);
+  processAudio();
+}
+
+function stopTuner(){
+  if (rafId) cancelAnimationFrame(rafId);
+  rafId = null;
+  if (sourceNode) sourceNode.disconnect();
+  if (analyser) analyser.disconnect();
+  if (mediaStream){
+    mediaStream.getTracks().forEach(t => t.stop());
+    mediaStream = null;
+  }
+  if (audioCtx){
+    try { audioCtx.close(); } catch(e){}
+    audioCtx = null;
+  }
+  setStatus('Stopped');
+  ctxEls.micPerm.textContent = 'Mic: idle';
+  updateUI(null, 0);
+}
+
+// controls
+ctxEls.startBtn.addEventListener('click', () => {
+  startTuner();
+});
+ctxEls.stopBtn.addEventListener('click', () => {
+  stopTuner();
+});
+ctxEls.aRef.addEventListener('input', (e) => {
+  ctxEls.aRefLabel.textContent = parseFloat(e.target.value).toFixed(1);
+});
+
+// mute
+ctxEls.muteBtn.addEventListener('click', () => {
+  isMuted = !isMuted;
+  ctxEls.muteBtn.textContent = isMuted ? 'Unmute' : 'Mute';
+  if (audioCtx && audioCtx.state !== 'closed'){
+    // easiest: stop and restart with muted gain or not
+    stopTuner();
+    setTimeout(() => startTuner(), 180);
+  }
+});
+
+// play reference tone (simple oscillator)
+ctxEls.calNote.addEventListener('click', () => {
+  const aRefVal = parseFloat(ctxEls.aRef.value);
+  // play A4 for 1.5s
+  const oCtx = new (window.AudioContext || window.webkitAudioContext)();
+  const o = oCtx.createOscillator();
+  const g = oCtx.createGain();
+  o.frequency.value = aRefVal;
+  o.type = 'sine';
+  g.gain.setValueAtTime(0.0001, oCtx.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.12, oCtx.currentTime + 0.02);
+  o.connect(g); g.connect(oCtx.destination);
+  o.start();
+  setTimeout(()=> {
+    g.gain.exponentialRampToValueAtTime(0.0001, oCtx.currentTime + 0.02 + 0.001);
+    setTimeout(()=> { o.stop(); oCtx.close(); }, 250);
+  }, 1400);
+});
+
+// keyboard hotkeys for convenience
+window.addEventListener('keydown', (e) => {
+  if (e.key === ' '){ e.preventDefault(); if (!rafId) startTuner(); else stopTuner(); }
+  if (e.key === 'm') ctxEls.muteBtn.click();
+  if (e.key === 'p') ctxEls.calNote.click();
+});
+
+// initial UI
+setStatus('Idle — press Start');
+ctxEls.micPerm.textContent = 'Mic: unknown';
+ctxEls.aRefLabel.textContent = ctxEls.aRef.value;
+
+// build tick marks on arc
+(function buildTicks(){
+  const ticks = document.getElementById('ticks');
+  const cx=200, cy=160, r=160;
+  for (let i=-50;i<=50;i+=5){
+    const angle = (i/100) * Math.PI * 0.8; // spread across ~144 degrees
+    const x1 = cx + Math.cos(Math.PI*1.1 - angle) * (r-12);
+    const y1 = cy + Math.sin(Math.PI*1.1 - angle) * (r-12);
+    const x2 = cx + Math.cos(Math.PI*1.1 - angle) * (r-28);
+    const y2 = cy + Math.sin(Math.PI*1.1 - angle) * (r-28);
+    const isMajor = (i%10===0);
+    const p = document.createElementNS('http://www.w3.org/2000/svg','path');
+    p.setAttribute('d', `M${x1} ${y1} L${x2} ${y2}`);
+    p.setAttribute('stroke', isMajor? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.05)');
+    p.setAttribute('stroke-width', isMajor? 2 : 1);
+    ticks.appendChild(p);
+    if (isMajor){
+      const tx = cx + Math.cos(Math.PI*1.1 - angle) * (r-44);
+      const ty = cy + Math.sin(Math.PI*1.1 - angle) * (r-44);
+      const t = document.createElementNS('http://www.w3.org/2000/svg','text');
+      t.setAttribute('x', tx);
+      t.setAttribute('y', ty + 4);
+      t.setAttribute('fill', 'rgba(255,255,255,0.06)');
+      t.setAttribute('font-size','10');
+      t.setAttribute('text-anchor','middle');
+      t.textContent = i;
+      ticks.appendChild(t);
+    }
+  }
+})();
+
+</script>
+</body>
+</html>
